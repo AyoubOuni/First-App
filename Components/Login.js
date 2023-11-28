@@ -16,7 +16,9 @@ const Login = (props) => {
     
         auth.signInWithEmailAndPassword(email, password)
         .then(()=>{
-          props.navigation.navigate('Home');
+          props.navigation.navigate('Home',{
+            currentid:auth.currentUser.uid,
+          });
   
         }).catch(err => {alert(err)})
       

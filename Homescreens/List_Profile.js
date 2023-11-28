@@ -1,34 +1,70 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import firebase from '../Config/Index';
 
-const profilesData = [
-  { id: '1', nom: 'John', prenom: 'Doe', tel: '+1234567890' },
-  { id: '2', nom: 'Jane', prenom: 'Smith', tel: '+1987654321' },
-  { id: '3', nom: 'Alex', prenom: 'Johnson', tel: '+1122334455' },
-  // Add more profiles as needed
-];
 
-const List_Profile = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredProfiles, setFilteredProfiles] = useState(profilesData);
+const List_Profile = (props) => {
+  const database = firebase.database();
+  const profilesRef = database.ref('profils');
+    const [profilesData, setProfilesData] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filteredProfiles, setFilteredProfiles] = useState([]);
+  
+    useEffect(() => {
+      profilesRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          setProfilesData(Object.values(data));
+          setFilteredProfiles(Object.values(data));
+        }
+      });
+    }, []);
 
-  const handleSearch = (text) => {
-    setSearchQuery(text);
-    const filtered = profilesData.filter(
-      (profile) =>
-        profile.nom.toLowerCase().includes(text.toLowerCase()) ||
-        profile.prenom.toLowerCase().includes(text.toLowerCase()) ||
-        profile.tel.toLowerCase().includes(text.toLowerCase())
-    );
-    setFilteredProfiles(filtered);
-  };
+    const handleSearch = (text) => {
+      setSearchQuery(text);
+      
+      const searchWords = text.toLowerCase().split(' ');
+      
+      const filtered = profilesData.filter((profile) =>
+        searchWords.every((word) =>
+          profile.nom.toLowerCase().includes(word) ||
+          profile.prenom.toLowerCase().includes(word) ||
+          profile.tel.toLowerCase().includes(word)
+        )
+      );
+      
+      setFilteredProfiles(filtered);
+    };
 
   const renderProfile = ({ item }) => (
     <View style={styles.profileItem}>
-      <Text>{`${item.nom} ${item.prenom}`}</Text>
-      <Text>{item.tel}</Text>
+      <Image source={item.url ?item.url:require('../assets/user.png')} style={styles.profileImage} />
+
+      <View style={styles.profileInfo}>
+        <Text>{`${item.nom} ${item.prenom}`}</Text>
+        <Text>{item.tel}</Text>
+      </View>
+
+      <View style={styles.buttonsContainer}>
+        <TouchableOpacity style={styles.button} onPress={() => handleDelete(item)}>
+          <Text>Message</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={() => handleCall(item)}>
+          <Text>Call</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
+
+  const handleDelete = (item) => {
+    // Handle delete action for the profile
+    console.log('Deleting:', item);
+  };
+
+  const handleCall = (item) => {
+    // Handle call action for the profile
+    console.log('Calling:', item);
+  };
 
   return (
     <View style={styles.container}>
@@ -38,7 +74,6 @@ const List_Profile = () => {
         value={searchQuery}
         onChangeText={handleSearch}
       />
-
       <FlatList
         data={filteredProfiles}
         keyExtractor={(item) => item.id}
@@ -61,9 +96,31 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   profileItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
+  },
+  profileInfo: {
+    flex: 1,
+    marginLeft: 10, // To adjust the space between image and text
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+  },
+  button: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    marginLeft: 10,
+  },
+  profileImage: {
+    width: 50, // Adjust width and height as needed
+    height: 50, // Adjust width and height as needed
+    borderRadius: 25, // For a circular image, set borderRadius to half of the width/height
   },
 });
 
