@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { Button, TextInput, Card } from 'react-native-paper';
 import img from './../assets/user.png';
@@ -6,39 +6,57 @@ import * as ImagePicker from "expo-image-picker";
 import firebase from '../Config/Index';
 import { TouchableOpacity } from 'react-native-web';
 const database=firebase.database();
+import { useRoute } from '@react-navigation/native';
+
 const MyAccount = (props) => {
-  const [nom, setnom] = useState('Ayoub');
+  const route = useRoute();
+  const currentid = route.params?.currentid; // Access the currentid parameter from route.params
+  const [userDetails, setUserDetails] = useState({
+    nom: '',
+    prenom: '',
+    tel: '',
+    url: '',
+    uid:"",
+  });
   const [Isdefault, setIsdefault] = useState(true);
   const [urlImage, seturlImage] = useState('');
-  const [prenom, setSsetprenom] = useState('Ouni');
-  const [tel, settel] = useState('+216 99 656 639');
+
+  useEffect(() => {
+    const profileRef = database.ref(`profils/${currentid}`);
+    setUserDetails({ ...userDetails, uid: currentid });
+
+    profileRef.once('value', (snapshot) => {
+      if (snapshot.exists()) {
+        const profileData = snapshot.val();
+        setUserDetails({ ...profileData, uid: currentid });
+        setIsdefault(true);
+        console.log(profileData)
+
+      }
+    })}
+  
+  , []);
+  
 
   const handleNameChange = (text) => {
-    setnom(text);
+    setUserDetails({ ...userDetails, nom: text });
   };
 
   const handleSurnameChange = (text) => {
-    setSsetprenom(text);
+    setUserDetails({ ...userDetails, prenom: text });
   };
 
   const handleEmailChange = (text) => {
-    settel(text);
+    setUserDetails({ ...userDetails, tel: text });
   };
 
-  const saveUserData =async () => {
-    const url=await uploadimagetofirebase(urlImage);
-    const ref_profils=database.ref("profils");
-    const key=ref_profils.push().key;
-    const ref_un_profile=ref_profils.child("profil" + key);
-    ref_un_profile.set(
-        {
-            nom:nom,
-            prenom:prenom,
-            tel:tel,
-            url:url
-        }
-    )
+  const saveUserData = async () => {
+  
+      await database.ref(`profils/${currentid}`).set(userDetails);
+      console.log('User details updated successfully!');
+    
   };
+ 
 
   const pickImage = async () => {
     // No permissions request is necessary for launching the image library
@@ -54,6 +72,8 @@ const MyAccount = (props) => {
     if (!result.canceled) {
       setIsdefault(false);
       seturlImage(result.assets[0].uri);
+      setUserDetails({ ...userDetails, url: result.assets[0].uri });
+
     }
   };
   const imageToBlob = async (uri) => {
@@ -101,7 +121,7 @@ return url;
       <TouchableOpacity onPress={async() =>{
           await pickImage();
       }}>
-      <Image source={Isdefault?require('./../assets/user.png'):{uri:urlImage}} style={styles.userPhoto} />
+      <Image source={Isdefault?userDetails.url?userDetails.url:require('./../assets/user.png'):{uri:urlImage}} style={styles.userPhoto} />
       </TouchableOpacity>
       {/* Name Card */}
       <Card style={styles.card}>
@@ -109,7 +129,7 @@ return url;
 
           <Text style={styles.cardTitle}>Nom</Text>
           <TextInput
-            value={nom}
+            value={userDetails.nom}
             onChangeText={handleNameChange}
             style={styles.input}
           />
@@ -121,7 +141,7 @@ return url;
         <Card.Content>
           <Text style={styles.cardTitle}>Prenom</Text>
           <TextInput
-            value={prenom}
+            value={userDetails.prenom}
             onChangeText={handleSurnameChange}
             style={styles.input}
           />
@@ -133,7 +153,7 @@ return url;
         <Card.Content>
           <Text style={styles.cardTitle}>N°Tel</Text>
           <TextInput
-            value={tel}
+            value={userDetails.tel}
             onChangeText={handleEmailChange}
             style={styles.input}
           />

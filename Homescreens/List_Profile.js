@@ -1,23 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import firebase from '../Config/Index';
+import { useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 
 
 const List_Profile = (props) => {
+  const route = useRoute();
+  const navigation = useNavigation();
+  const currentid = route.params?.currentid; // Access the currentid parameter from route.params
   const database = firebase.database();
   const profilesRef = database.ref('profils');
     const [profilesData, setProfilesData] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [counted, setcounted] = useState({id:'',count:0});
     const [filteredProfiles, setFilteredProfiles] = useState([]);
   
     useEffect(() => {
+      console.log(currentid);
+      console.log(currentid);
       profilesRef.on('value', (snapshot) => {
         const data = snapshot.val();
         if (data) {
-          setProfilesData(Object.values(data));
-          setFilteredProfiles(Object.values(data));
+          const profiles = Object.values(data);
+          
+          // Filter out the profile where uid matches the key
+          const filteredProfiles = profiles.filter(profile => profile.uid !== currentid);
+          
+          setProfilesData(filteredProfiles);
+          setFilteredProfiles(filteredProfiles);
         }
       });
+      
+    }, []);
+
+    const ref_msg = database.ref("msgS");
+
+    // Function to retrieve the count of unread messages
+    const countUnreadMessages = async () => {
+      try {
+        const snapshot = await ref_msg.orderByChild('status')
+          .equalTo(false)
+          .once('value');
+    
+        const profilesCopy = [...profilesData]; // Make a copy of the profiles list
+    
+        snapshot.forEach((childSnapshot) => {
+          const message = childSnapshot.val();
+          const senderId = message.sender;
+          
+          // Find the index of the sender in the profiles list
+          const senderIndex = profilesCopy.findIndex(profile => profile.uid === senderId);
+          if (senderIndex !== -1) {
+            profilesCopy[senderIndex].unreadCount = profilesCopy[senderIndex].unreadCount ? profilesCopy[senderIndex].unreadCount + 1 : 1;
+          }
+        });
+    
+        // Update the state with the updated profiles list including unread counts
+        setProfilesData(profilesCopy);
+        console.log(profilesCopy)
+      } catch (error) {
+        console.error('Error counting unread messages:', error);
+      }
+    };
+    
+    useEffect(() => {
+      countUnreadMessages();
     }, []);
 
     const handleSearch = (text) => {
@@ -37,16 +85,26 @@ const List_Profile = (props) => {
     };
 
   const renderProfile = ({ item }) => (
-    <View style={styles.profileItem}>
+    <View style={styles.profileItem} onClick={()=>{
+      alert(`
+      Profil Details
+      Nom : ${item.nom}
+      Prenom : ${item.prenom}
+      Tel : ${item.tel}
+      `)
+    }}>
       <Image source={item.url ?item.url:require('../assets/user.png')} style={styles.profileImage} />
 
-      <View style={styles.profileInfo}>
+      <View style={styles.profileInfo} >
         <Text>{`${item.nom} ${item.prenom}`}</Text>
         <Text>{item.tel}</Text>
       </View>
 
       <View style={styles.buttonsContainer}>
-        <TouchableOpacity style={styles.button} onPress={() => handleDelete(item)}>
+        <TouchableOpacity style={styles.button} onPress={() => {
+
+  navigation.navigate('Chat', { currentId: currentid,id_user:item.uid }); // Adjust 'Chat' and 'currentId' as needed
+}}>
           <Text>Message</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={() => handleCall(item)}>
@@ -74,11 +132,13 @@ const List_Profile = (props) => {
         value={searchQuery}
         onChangeText={handleSearch}
       />
+
       <FlatList
         data={filteredProfiles}
         keyExtractor={(item) => item.id}
         renderItem={renderProfile}
       />
+
     </View>
   );
 };

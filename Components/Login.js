@@ -10,21 +10,16 @@ const Login = (props) => {
     
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-  
-    const handleHome = () => {
-
     
-        auth.signInWithEmailAndPassword(email, password)
-        .then(()=>{
-          props.navigation.navigate('Home',{
-            currentid:auth.currentUser.uid,
+    const handleHome =async () => {
+      const userCredential = await auth.signInWithEmailAndPassword(email, password);
+    const uid = userCredential.user.uid;
+    props.navigation.navigate('Home', {
+           currentid: uid,
           });
-  
-        }).catch(err => {alert(err)})
       
-      // Handle inscription logic here
-      // Add your inscription logic
     };
+    
   
    
   
