@@ -4,6 +4,7 @@ import List_Profile from '../Homescreens/List_Profile';
 import MyAccount from '../Homescreens/MyAccount';
 import Groupe from '../Homescreens/Groupe';
 import { useRoute } from '@react-navigation/native';
+import HomeBlog from '../Homescreens/HomeBlog';
 
 const Tab = createMaterialBottomTabNavigator();
 
@@ -12,11 +13,21 @@ const Home = ({ navigation }) => {
   const { currentid } = route.params;
 
   return (
+
+    
     <Tab.Navigator
-      initialRouteName="listprofile"
+      initialRouteName="Home"
       screenOptions={{ tabBarVisible: true }}
       backBehavior="initialRoute"
     >
+      <Tab.Screen
+    name="Home"
+    component={HomeBlog}
+    initialParams={{ currentid: currentid }}
+    options={{
+      tabBarLabel: 'Home',
+    }}
+  />
       <Tab.Screen
         name="listprofile"
         component={List_Profile}
@@ -28,6 +39,8 @@ const Home = ({ navigation }) => {
       <Tab.Screen
         name="groupe"
         component={Groupe}
+        initialParams={{ currentid: currentid }}
+
         options={{
           tabBarLabel: 'Groupe',
         }}

@@ -21,6 +21,9 @@ const Inscription = (props) => {
     // Handle inscription logic here
     // Add your inscription logic
   };
+  const back = () => {
+    props.navigation.navigate('Login');
+  };
 
   return (
     <ImageBackground source={picture} style={styles.backgroundImage}>
@@ -50,6 +53,9 @@ const Inscription = (props) => {
        
         <TouchableOpacity style={styles.createAccountButton} onPress={handleInscription}>
           <Text style={styles.buttonText}>S'inscrire</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.back} onPress={back}>
+          <Text style={styles.buttonText}>Back</Text>
         </TouchableOpacity>
     </ImageBackground>
   );
@@ -84,6 +90,13 @@ const styles = StyleSheet.create({
       paddingVertical: 10,
       paddingHorizontal: 20,
       borderRadius: 5,
+    },
+    back: {
+      backgroundColor: 'grey',
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 5,
+      marginTop:15
     },
     buttonText: {
       color: '#fff',

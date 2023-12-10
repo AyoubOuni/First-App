@@ -3,6 +3,8 @@ import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image } 
 import firebase from '../Config/Index';
 import { useRoute } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
+import call from 'react-native-phone-call'
+
 
 
 const List_Profile = (props) => {
@@ -13,9 +15,15 @@ const List_Profile = (props) => {
   const profilesRef = database.ref('profils');
     const [profilesData, setProfilesData] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [phone, setphone] = useState('');
     const [counted, setcounted] = useState({id:'',count:0});
     const [filteredProfiles, setFilteredProfiles] = useState([]);
-  
+    const args = {
+      number: phone, // String value with the number to call
+      prompt: false, // Optional boolean property. Determines if the user should be prompted prior to the call 
+      skipCanOpen: true // Skip the canOpenURL check
+    }
+    
     useEffect(() => {
       console.log(currentid);
       console.log(currentid);
@@ -103,11 +111,15 @@ const List_Profile = (props) => {
       <View style={styles.buttonsContainer}>
         <TouchableOpacity style={styles.button} onPress={() => {
 
-  navigation.navigate('Chat', { currentId: currentid,id_user:item.uid }); // Adjust 'Chat' and 'currentId' as needed
+  navigation.navigate('Chat', { currentId: currentid,id_user:item.uid,username:item.nom+" "+item.prenom,img:item.url }); // Adjust 'Chat' and 'currentId' as needed
 }}>
           <Text>Message</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => handleCall(item)}>
+        <TouchableOpacity style={styles.button} onPress={() => {
+setphone(item.tel);
+call(args).catch(console.error)
+ // Adjust 'Chat' and 'currentId' as needed
+}}>
           <Text>Call</Text>
         </TouchableOpacity>
       </View>

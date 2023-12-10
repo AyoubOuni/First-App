@@ -7,20 +7,27 @@ const Login = (props) => {
     const handleCreateAccount = () => {
       props.navigation.navigate('Inscription');
     };
-    
+    const [error, setError] = useState(null);
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     
-    const handleHome =async () => {
-      const userCredential = await auth.signInWithEmailAndPassword(email, password);
-    const uid = userCredential.user.uid;
-    props.navigation.navigate('Home', {
-           currentid: uid,
-          });
-      
-    };
     
-  
+
+    const handleHome = async () => {
+      try {
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        const uid = userCredential.user.uid;
+        props.navigation.navigate('Home', { currentid: uid });
+      } catch (error) {
+        setError('Invalide Email or Password !'); // Set error message if authentication fails
+      }
+    };
+
+    
+    const handleForgotPassword = () => {
+      props.navigation.navigate('ResetPassword');
+    };
    
   
     return (
@@ -39,16 +46,43 @@ const Login = (props) => {
             value={password}
             secureTextEntry={true}
           />
+                {error && <Text style={styles.errorText}>{error}</Text>} {/* Display error message */}
+
           <TouchableOpacity style={styles.loginButton} onPress={handleHome}>
             <Text style={styles.buttonText}>Login</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleCreateAccount}>
             <Text style={styles.createAccountText}>Create Account</Text>
           </TouchableOpacity>
+          <TouchableOpacity onPress={handleForgotPassword}>
+        <Text style={styles.forget}>Forgot Password?</Text>
+      </TouchableOpacity>
       </ImageBackground>
     );
   };
 const styles = StyleSheet.create({
+  errorText: {
+    marginTop: 15,
+    color: 'red',
+    fontSize: 16,
+    fontWeight: 'bold',
+    backgroundColor: 'rgba(255, 0, 0, 0.2)',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    marginBottom:10,
+    marginTop:10,
+  },
+  forgotPasswordText: {
+    marginTop: 15,
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    backgroundColor: 'grey',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
   backgroundImage: {
     flex: 1,
     resizeMode: 'cover', // or 'stretch' as per your preference
@@ -94,6 +128,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     backgroundColor: 'grey',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  forget: {
+    marginTop: 15,
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    backgroundColor: 'orange',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 5,

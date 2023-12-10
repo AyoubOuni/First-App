@@ -1,6 +1,8 @@
 import React, { useEffect, useState ,useRef} from 'react';
-import { View, StyleSheet, Text, TextInput, TouchableOpacity, FlatList,Image,Linking,ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Text, TextInput,Modal,CheckBox, TouchableOpacity, FlatList,Image,Linking,ActivityIndicator } from 'react-native';
 import { KeyboardAvoidingView, Platform } from 'react-native';
+import { FaSignOutAlt } from "react-icons/fa";
+import { IoIosAddCircle } from "react-icons/io";
 
 import firebase from '../Config/Index';
 import { useRoute, useNavigation } from '@react-navigation/native'; // Import useNavigation
@@ -25,10 +27,11 @@ import ClipLoader from "react-spinners/ClipLoader";
 
 const database = firebase.database();
 
-export default function Chat() {
+export default function ChatGroupe() {
   const [isTyping, setIsTyping] = useState(false);
   let [color, setColor] = useState("#000");
   const [isMuted, setIsMuted] = useState(true); // State to store mute status
+  const [users, setUsers] = useState([]);
 
   const handleMuteToggle = () => {
     setIsMuted((prevState) => !prevState); // Toggle mute status
@@ -37,9 +40,10 @@ export default function Chat() {
   const storage=firebase.storage();
 
   const route = useRoute();
-  const { currentId, id_user,username,img } = route.params;
+  const { currentId, id_groupe,nom_groupe } = route.params;
   const [msg, setMsg] = useState('');
   const [messages, setMessages] = useState([]);
+  const [currentgroupe, setcurrentgroupe] = useState([]);
   const [scrollY, setScrollY] = useState(0); // State to store scroll position
 
 // Function to handle clicks on the media
@@ -47,39 +51,105 @@ const handleMediaClick = (media, y) => {
   setSelectedMedia(media);
   setScrollY(y); // Store the scroll position when the media is clicked
 };
+const profilesRef = database.ref('profils');
+const [notusers, setnotUsers] = useState([]);
 
-const [userAvatar, setUserAvatar] = useState('');
-
-  useEffect(() => {
-    // Function to fetch user data by ID from Firebase
-    const fetchUserAvatar = async (userId) => {
-      try {
-        const snapshot = await firebase.database().ref(`profils/${userId}`).once('value');
-        const userData = snapshot.val();
-
-        // Extract and decode the Base64 image string
-        if (userData && userData.url) {
-          setUserAvatar(userData.url);
-          console.log(userData.url)
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-      }
-    };
-
-    // Call the function with the user ID
-    fetchUserAvatar(id_user);
-  }, []);
-
+const addToGroup = async (groupID, userID) => {
+    try {
+      const groupsRef = firebase.database().ref('groups');
   
+      groupsRef.once('value', (snapshot) => {
+        const groups = snapshot.val();
+        if (groups) {
+          // Find the group with the matching groupID
+          const groupToAdd = Object.entries(groups).find(([key, group]) => group.id === groupID);
+  
+          if (groupToAdd) {
+            const [groupKey, groupData] = groupToAdd;
+            const groupMembersRef = firebase.database().ref(`groups/${groupKey}/members`);
+            groupMembersRef.update({ [userID]: true });
+            console.log(`User ${userID} added to group ${groupID} successfully.`);
+          } else {
+            console.error("Group not found.");
+          }
+        } else {
+          console.error("No groups found.");
+        }
+      });
+    } catch (error) {
+      console.error("Error adding user to group:", error);
+    }
+  };
+  
+
+useEffect(() => {
+    const groupsRef = firebase.database().ref('groups');
+  
+    groupsRef.once('value', (snapshot) => {
+      const groups = snapshot.val();
+      if (groups) {
+        // Find the group with the matching groupID
+        const groupToRemove = Object.entries(groups).find(
+          ([key, group]) => group.id === id_groupe
+        );
+  
+        if (groupToRemove) {
+          const [groupKey, groupData] = groupToRemove;
+          setcurrentgroupe(groupData);
+  
+          profilesRef.once('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              const profiles = Object.values(data);
+  
+              // Filter out the profile where uid matches the key
+              const filteredProfiles = profiles.filter(
+                (profile) => profile.uid !== currentId
+              );
+  
+              // Filter non-group members from the fetched profiles
+              const nonGroupMembers = filteredProfiles.filter(
+                (profile) => !Object.keys(groupData.members).includes(profile.uid)
+              );
+  
+              setnotUsers(nonGroupMembers);
+              console.log(nonGroupMembers);
+            }
+          });
+        } else {
+          console.error('Group not found.');
+        }
+      } else {
+        console.error('No groups found.');
+      }
+    });
+  }, []);
+  const [visible, setVisible] = useState(false);
+
+  const [selectedUsers, setSelectedUsers] = useState([]); // State to hold selected users' IDs
+  const handleAddToGroup = () => {
+    // Logic to add selected users to the group
+    // Call the addToGroup function for each selected user
+    selectedUsers.forEach(userID => addToGroup(id_groupe, userID));
+    setVisible(false)
+
+    // Close the modal
+  };
+  const handleSelectUser = (userID) => {
+    // Toggle selection of the user
+    const updatedSelectedUsers = selectedUsers.includes(userID)
+      ? selectedUsers.filter(id => id !== userID)
+      : [...selectedUsers, userID];
+    setSelectedUsers(updatedSelectedUsers);
+  };
   const returnToList = () => {
     navigation.goBack(); // Navigate back to the list screen
   };
   const handleTyping = (isFocused) => {
-    const currentUserTypingRef = database.ref(`conversation/${currentId}_${id_user}/isTyping`);
+    const currentUserTypingRef = database.ref(`conversation/${currentId}_${id_groupe}/isTyping`);
     currentUserTypingRef.set(isFocused);
 
-    const otherUserTypingRef = database.ref(`conversation/${id_user}_${currentId}/isTyping`);
+    const otherUserTypingRef = database.ref(`conversation/${id_groupe}_${currentId}/isTyping`);
     otherUserTypingRef.on('value', (snapshot) => {
       const otherUserIsTyping = snapshot.val();
       setIsTyping(otherUserIsTyping);
@@ -87,15 +157,14 @@ const [userAvatar, setUserAvatar] = useState('');
   };
 
   useEffect(() => {
-    const messageRef = database.ref('msgS').orderByChild('time');
+    const messageRef = database.ref('msgSGroupe').orderByChild('time');
     
     messageRef.on('value', (snapshot) => {
       const messagesArray = [];
       snapshot.forEach((childSnapshot) => {
         const message = childSnapshot.val();
         if (
-          (message.sender === currentId && message.receiver === id_user) ||
-          (message.sender === id_user && message.receiver === currentId)
+          (message.id_groupe === id_groupe )
         ) {
           messagesArray.push({ ...message, id: childSnapshot.key });
         }
@@ -109,7 +178,7 @@ const [userAvatar, setUserAvatar] = useState('');
     return () => {
       messageRef.off('value');
     };
-  }, [currentId, id_user]);
+  }, [currentId]);
   const [isLoading, setIsLoading] = useState(false);
 
   const pickImage = async () => {
@@ -141,18 +210,18 @@ const [userAvatar, setUserAvatar] = useState('');
   
           // Send the image URL to the chat
           const currentTime = new Date().toISOString();
-          const ref_msg = database.ref('msgS');
+          const ref_msg = database.ref('msgSGroupe');
           const key = ref_msg.push().key;
           ref_msg
             .child(key)
             .set({
               msg: uploadedImageUrl, // Save the image URL in the message
-              id: currentId + '_' + id_user + '_' + currentTime,
-              sender: currentId,
-              receiver: id_user,
-              time: currentTime,
-              status: false,
-              droped: false,
+              id:currentId+"_"+id_groupe+"_"+currentTime,
+              id_groupe:id_groupe,
+      sender: currentId,
+      time: currentTime,
+      status:false,
+      droped:false,
             })
             .then(() => {
               setIsLoading(false); // Set loading state to false after successful upload and message creation
@@ -193,16 +262,16 @@ const [userAvatar, setUserAvatar] = useState('');
   
       // Here, you can send the Google Maps URL as part of your message
       const currentTime = new Date().toISOString();
-      const ref_msg = database.ref("msgS");
+      const ref_msg = database.ref("msgSGroupe");
       const key = ref_msg.push().key;
       ref_msg.child(key).set({
         msg: googleMapsUrl, // Send the Google Maps URL in the message
-        id:currentId+"_"+id_user+"_"+currentTime,
-        sender: currentId,
-        receiver: id_user,
-        time: currentTime,
-        status:false,
-        droped:false,
+        id:currentId+"_"+id_groupe+"_"+currentTime,
+        id_groupe:id_groupe,
+      sender: currentId,
+      time: currentTime,
+      status:false,
+      droped:false,
       });
     } catch (error) {
       console.error('Error getting location:', error);
@@ -226,6 +295,51 @@ const [userAvatar, setUserAvatar] = useState('');
   };
   const [selectedMedia, setSelectedMedia] = useState(null);
 
+  const removeFromGroup = async (groupID, userID) => {
+    try {
+      const groupsRef = firebase.database().ref('groups');
+  
+      groupsRef.once('value', (snapshot) => {
+        const groups = snapshot.val();
+        if (groups) {
+          // Find the group with the matching groupID
+          const groupToRemove = Object.entries(groups).find(([key, group]) => group.id === groupID);
+  
+          if (groupToRemove) {
+            const [groupKey, groupData] = groupToRemove;
+            const groupMembersRef = firebase.database().ref(`groups/${groupKey}/members/${userID}`);
+            groupMembersRef.remove();
+            console.log(`User ${userID} removed from group ${groupID} successfully.`);
+          } else {
+            console.error("Group not found.");
+          }
+        } else {
+          console.error("No groups found.");
+        }
+      });
+    } catch (error) {
+      console.error("Error removing user from group:", error);
+    }
+  };
+  
+  
+  // Call this function when the user wants to leave the group
+
+
+  const handleLeaveGroup =async () => {
+    const confirmLeave = window.confirm('Are you sure you want to Leave this groupe ?');
+    if (confirmLeave){
+            await removeFromGroup(id_groupe, currentId);
+            navigation.goBack(); // Navigate back to the list screen
+
+          } 
+    
+  };
+
+
+
+
+
   const openGoogleMapsLink = (url) => {
     Linking.openURL(url);
   };
@@ -237,7 +351,7 @@ const [userAvatar, setUserAvatar] = useState('');
 
       // Upload blob to Firebase Storage
       const storageRef = firebase.storage().ref();
-      const imageRef = storageRef.child(`msgs/${currentId}_${id_user}_${timestamp}.${extension}`);
+      const imageRef = storageRef.child(`msgSGroupe/${currentId}_${id_groupe}_${timestamp}.${extension}`);
       const snapshot = await imageRef.put(blob);
   
       // Get the download URL of the uploaded image
@@ -256,26 +370,25 @@ const [userAvatar, setUserAvatar] = useState('');
     
     if (confirmDrop) {
       // Find the message with the specified ID in the database
-      const messagesRef = database.ref('msgS');
+      const messagesRef = database.ref('msgSGroupe');
       messagesRef.orderByChild('id').equalTo(messageId).once('value', (snapshot) => {
         snapshot.forEach((childSnapshot) => {
           const messageKey = childSnapshot.key;
           // Update the status of the message to mark it as unsent
-          database.ref(`msgS/${messageKey}`).update({ 
+          database.ref(`msgSGroupe/${messageKey}`).update({ 
             msg: 'unsent',      
             droped: true,      
           })
           .then(() => {
             console.log(`Message with ID ${messageId} marked as unsent`);
-            const messageRef = database.ref('msgS').orderByChild('time');
-  
+            const messageRef = database.ref('msgSGroupe').orderByChild('time');
+    
             messageRef.on('value', (snapshot) => {
               const messagesArray = [];
               snapshot.forEach((childSnapshot) => {
                 const message = childSnapshot.val();
                 if (
-                  (message.sender === currentId && message.receiver === id_user) ||
-                  (message.sender === id_user && message.receiver === currentId)
+                  (message.id_groupe === id_groupe )
                 ) {
                   messagesArray.push({ ...message, id: childSnapshot.key });
                 }
@@ -284,6 +397,8 @@ const [userAvatar, setUserAvatar] = useState('');
               messagesArray.sort((a, b) => a.time - b.time);
               setMessages(messagesArray);
             });
+            
+          
           })
           .catch((error) => {
             console.error('Error updating message status:', error);
@@ -311,13 +426,16 @@ const [userAvatar, setUserAvatar] = useState('');
 
   const sendMessage = () => {
     const currentTime = new Date().toISOString();
-    const ref_msg = database.ref("msgS");
+    const ref_msg = database.ref("msgSGroupe");
     const key = ref_msg.push().key;
     ref_msg.child(key).set({
-      id:currentId+"_"+id_user+"_"+currentTime,
+
+       
+
+      id:currentId+"_"+id_groupe+"_"+currentTime,
       msg: msg,
+      id_groupe:id_groupe,
       sender: currentId,
-      receiver: id_user,
       time: currentTime,
       status:false,
       droped:false,
@@ -328,6 +446,9 @@ const handleCloseButtonClick = () => {
       setSelectedMedia(null);
     };
   const renderMessage = ( { item, index }) => {
+    const sender = users.find(user => user.uid === item.sender);
+    const userAvatar = sender ? sender.url : null;
+    const usernom = sender ? sender.nom : null;
     const isCurrentUser = item.sender === currentId;
     const isGoogleMapsLink = item.msg && item.msg.includes('google.com/maps');
 
@@ -344,7 +465,7 @@ const handleCloseButtonClick = () => {
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
               <View style={[styles.messageContainer, styles.currentUserMessage2]}>
                 {item.droped === false && (
-                  <TouchableOpacity onPress={() => handleDropMessage(`${item.sender}_${item.receiver}_${item.time}`)}>
+                  <TouchableOpacity onPress={() => handleDropMessage(`${item.sender}_${item.id_groupe}_${item.time}`)}>
                     <Text style={{ marginRight: 5, alignSelf: 'center', position: 'relative', top: 5 }}>
                       <MdDelete size={22} style={{ color: 'red' }} />
                     </Text>
@@ -420,7 +541,7 @@ const handleCloseButtonClick = () => {
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
               <View style={[styles.messageContainer, styles.currentUserMessage2]}>
                 {item.droped === false && (
-                  <TouchableOpacity onPress={() => handleDropMessage(`${item.sender}_${item.receiver}_${item.time}`)}>
+                  <TouchableOpacity onPress={() => handleDropMessage(`${item.sender}_${item.id_groupe}_${item.time}`)}>
                     <Text style={{ marginRight: 5, alignSelf: 'center', position: 'relative', top: 5 }}>
                       <MdDelete size={22} style={{ color: 'red' }} />
                     </Text>
@@ -538,7 +659,7 @@ return (
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
         <View style={[styles.messageContainer, styles.currentUserMessage2]}>
           {item.droped === false && (
-            <TouchableOpacity onPress={() => handleDropMessage(`${item.sender}_${item.receiver}_${item.time}`)}>
+            <TouchableOpacity onPress={() => handleDropMessage(`${item.sender}_${item.id_groupe}_${item.time}`)}>
               <Text style={{ marginRight: 5, alignSelf: 'center', position: 'relative', top: 5 }}>
                 <MdDelete size={22} style={{ color: 'red' }} />
               </Text>
@@ -609,7 +730,7 @@ return (
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
               <View style={[styles.messageContainer, styles.currentUserMessage2]}>
                 {item.droped === false && (
-                  <TouchableOpacity onPress={() => handleDropMessage(`${item.sender}_${item.receiver}_${item.time}`)}>
+                  <TouchableOpacity onPress={() => handleDropMessage(`${item.sender}_${item.id_groupe}_${item.time}`)}>
                     <Text style={{ marginRight: 5, alignSelf: 'center', position: 'relative', top: 5 }}>
                       <MdDelete size={22} style={{ color: 'red' }} />
                     </Text>
@@ -692,7 +813,7 @@ return (
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
               <View style={[styles.messageContainer, styles.currentUserMessage2]}>
                 {item.droped === false && (
-                  <TouchableOpacity onPress={() => handleDropMessage(`${item.sender}_${item.receiver}_${item.time}`)}>
+                  <TouchableOpacity onPress={() => handleDropMessage(`${item.sender}_${item.id_groupe}_${item.time}`)}>
                     <Text style={{ marginRight: 5, alignSelf: 'center', position: 'relative', top: 5 }}>
                       <MdDelete size={22} style={{ color: 'red' }} />
                     </Text>
@@ -724,7 +845,7 @@ return (
                             <View>
 
 
-
+<Text style={[styles.messageContainer, styles.currentUserMessage3,{ fontSize:13}]}>{usernom}</Text>
 
 <View style={{ flexDirection: 'row', justifyContent: 'flex-start' }}>
               <View style={[styles.messageContainer, styles.currentUserMessage2,{  paddingBottom: 0,}]}>
@@ -771,39 +892,24 @@ return (
   return (
 
     <View style={styles.container}>
-          <View >
+              <View >
 
-<TouchableOpacity
-  style={[styles.returnButton,{marginBottom:8,padding:7}]}
-  onPress={returnToList}
->
-  <IoChevronBackCircleSharp size={30} />
-</TouchableOpacity>
-
-
-<Image source={img ?img :require('../assets/user.png')}   style={{
-marginRight: 40,
-alignSelf: 'center',
-justifyContent: 'center',
-alignItems: 'center',
-marginBottom: 10,
-width: 100,
-height: 100,
-borderRadius: 50,
-}} />
-
-<Text style={{
-marginRight: 40,
-alignSelf: 'center',
-alignContent: 'center',
-display: 'flex',
-justifyContent: 'center',
-marginBottom: 40,
-fontSize:22,
-fontWeight: 'bold',}}>{username}</Text>
+      <TouchableOpacity
+        style={[styles.returnButton,{marginBottom:8,padding:7}]}
+        onPress={returnToList}
+      >
+        <IoChevronBackCircleSharp size={30} />
+      </TouchableOpacity>
+      <Text style={{
+    marginRight: 40,
+    alignSelf: 'center',
+    alignContent: 'center',
+    display: 'flex',
+    justifyContent: 'center',
+    marginBottom: 40,
+    fontSize:22,
+    fontWeight: 'bold',}}>{nom_groupe}</Text>
 </View>
-     
-  
       <FlatList
       
   data={messages}
@@ -851,6 +957,7 @@ fontWeight: 'bold',}}>{username}</Text>
 <View><TouchableOpacity onPress={handleCloseButtonClick} style={styles.closeButton}>
 <IoMdCloseCircleOutline size={25} />
           </TouchableOpacity>
+          
           <Image source={{ uri: selectedMedia }} style={styles.selectedMedia} />
 
           
@@ -883,6 +990,17 @@ fontWeight: 'bold',}}>{username}</Text>
       >
         <IoChevronBackCircleSharp size={25} />
       </TouchableOpacity>
+
+      <TouchableOpacity  onPress={() => setVisible(true)}  style={{ marginRight: 10 }}>
+      <IoIosAddCircle size={25} />
+</TouchableOpacity>
+      <TouchableOpacity onPress={handleLeaveGroup} style={{ marginRight: 10 }}>
+        {/* Add your icon or button for leaving the group here */}
+        {/* For example, you can use an icon like "Leave Group" */}
+        <FaSignOutAlt size={22}  />
+
+      </TouchableOpacity>
+     
   <TouchableOpacity onPress={sendCurrentLocation} style={{ marginRight: 10 }}>
     <FaLocationArrow size={20} />
   </TouchableOpacity>
@@ -893,6 +1011,55 @@ fontWeight: 'bold',}}>{username}</Text>
     <FaCloudUploadAlt size={22} />
   </TouchableOpacity>
 </View>
+
+
+
+
+<Modal
+  animationType="slide"
+  transparent={false}
+ visible={visible}
+ onRequestClose={() => setVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+    <Text>Choose users to add to the group:</Text>
+
+    {notusers.map(user => (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+<CheckBox
+            value={selectedUsers.includes(user.uid)}
+            onValueChange={() => handleSelectUser(user.uid)}
+          />
+                    <Image source={user.url ?user.url:require('../assets/user.png')} style={styles.profileImage}  />
+                    <Text>{user.nom} {user.prenom}</Text>
+        </View>
+
+      
+      ))}
+
+
+<TouchableOpacity onPress={handleAddToGroup}  style={styles.actionButton}>
+        <Text  style={styles.buttonText}>Add to Group</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => setVisible(false)} style={styles.actionButton}>
+        <Text style={styles.buttonText}>Cancel</Text>
+      </TouchableOpacity>
+
+    </View>
+  </View>
+</Modal>
+
+
+
+
+
+
+
+
+
+
+
 
 
 <InputEmoji
@@ -931,6 +1098,73 @@ fontWeight: 'bold',}}>{username}</Text>
   
 }
 const styles = StyleSheet.create({
+    
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+  },
+  input: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    marginBottom: 10,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+  },
+  actionButton: {
+    backgroundColor: 'blue',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  buttonText: {
+    color: 'white',
+    textAlign: 'center',
+  },
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  createGroupButton: {
+    backgroundColor: 'blue',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 20,
+  },
+  createGroupText: {
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  groupHeaderText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  groupItem: {
+    padding: 10,
+    backgroundColor: '#eee',
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+  groupItemText: {
+    fontSize: 16,
+  },
+  profileImage: {
+    width: 36, // Reduced width
+    height: 36, // Reduced height
+    borderRadius: 18, // For a circular image, set borderRadius to half of the width/height
+    margin: 8, // Added margin for separation
+    // Added margin for separation
+  },
   typingIndicator: {
     fontStyle: 'italic',
     color: '#6B52AE',
@@ -1008,6 +1242,10 @@ currentUserMessage: {
   color:"#fff"
 },currentUserMessage2: {
   alignSelf: "center",
+  
+},
+currentUserMessage3: {
+  alignSelf: "flex-start",
   
 },
 currentUserupload: {
