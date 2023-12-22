@@ -1,22 +1,22 @@
-import React, { useState,useEffect } from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Image, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { Button, TextInput, Card } from 'react-native-paper';
 import img from './../assets/user.png';
 import * as ImagePicker from "expo-image-picker";
 import firebase from '../Config/Index';
 import { TouchableOpacity } from 'react-native-web';
-const database=firebase.database();
+const database = firebase.database();
 import { useRoute } from '@react-navigation/native';
 
 const MyAccount = (props) => {
   const route = useRoute();
-  const currentid = route.params?.currentid; // Access the currentid parameter from route.params
+  const currentid = route.params?.currentid;
   const [userDetails, setUserDetails] = useState({
     nom: '',
     prenom: '',
     tel: '',
     url: '',
-    uid:"",
+    uid: "",
   });
   const [Isdefault, setIsdefault] = useState(true);
   const [urlImage, seturlImage] = useState('');
@@ -30,13 +30,9 @@ const MyAccount = (props) => {
         const profileData = snapshot.val();
         setUserDetails({ ...profileData, uid: currentid });
         setIsdefault(true);
-        console.log(profileData)
-
       }
-    })}
-  
-  , []);
-  
+    })
+  }, []);
 
   const handleNameChange = (text) => {
     setUserDetails({ ...userDetails, nom: text });
@@ -51,15 +47,11 @@ const MyAccount = (props) => {
   };
 
   const saveUserData = async () => {
-  
-      await database.ref(`profils/${currentid}`).set(userDetails);
-      console.log('User details updated successfully!');
-    
+    await database.ref(`profils/${currentid}`).set(userDetails);
+    console.log('User details updated successfully!');
   };
- 
 
   const pickImage = async () => {
-    // No permissions request is necessary for launching the image library
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
@@ -67,109 +59,68 @@ const MyAccount = (props) => {
       quality: 1,
     });
 
-    // console.log(result);
-
     if (!result.canceled) {
       setIsdefault(false);
       seturlImage(result.assets[0].uri);
       setUserDetails({ ...userDetails, url: result.assets[0].uri });
-
     }
   };
-  const imageToBlob = async (uri) => {
-    const blob = await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.onload = function () {
-        resolve(xhr.response);
-      };
-      xhr.onerror = function (e) {
-        console.log(e);
-        reject(new TypeError("Network request failed"));
-      };
-      xhr.responseType = "blob"; //bufferArray
-      xhr.open("GET", uri, true);
-      xhr.send(null);
-    });
-    return blob;
-  };
-
-  const uploadimagetofirebase=async(uriLocal) => {
-
-//convertir image to blob
-const blob=await imageToBlob(uriLocal);
-
-
-//upload blob to firebase
-const storage=firebase.storage();
-const ref_mesimages=storage.ref("Mesimages");
-const ref_image=ref_mesimages.child("image.jpg");
-ref_image.put(blob);
-//recuperer url
-const url=ref_image.getDownloadURL();
-return url;
-
-
-  }
-
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <View style={styles.container}>
+        <Text style={styles.title}>My Account</Text>
 
-      <Text style={styles.title}>My Account</Text>
+        <TouchableOpacity onPress={async () => { await pickImage(); }}>
+          <Image source={Isdefault ? userDetails.url ? { uri: userDetails.url } : require('./../assets/user.png') : { uri: urlImage }} style={styles.userPhoto} />
+        </TouchableOpacity>
 
-      {/* User Photo */}
-      <TouchableOpacity onPress={async() =>{
-          await pickImage();
-      }}>
-      <Image source={Isdefault?userDetails.url?userDetails.url:require('./../assets/user.png'):{uri:urlImage}} style={styles.userPhoto} />
-      </TouchableOpacity>
-      {/* Name Card */}
-      <Card style={styles.card}>
-        <Card.Content>
+        <Card style={styles.card}>
+          <Card.Content>
+            <Text style={styles.cardTitle}>Nom</Text>
+            <TextInput
+              value={userDetails.nom}
+              onChangeText={handleNameChange}
+              style={styles.input}
+            />
+          </Card.Content>
+        </Card>
 
-          <Text style={styles.cardTitle}>Nom</Text>
-          <TextInput
-            value={userDetails.nom}
-            onChangeText={handleNameChange}
-            style={styles.input}
-          />
-        </Card.Content>
-      </Card>
+        <Card style={styles.card}>
+          <Card.Content>
+            <Text style={styles.cardTitle}>Prenom</Text>
+            <TextInput
+              value={userDetails.prenom}
+              onChangeText={handleSurnameChange}
+              style={styles.input}
+            />
+          </Card.Content>
+        </Card>
 
-      {/* Surname Card */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <Text style={styles.cardTitle}>Prenom</Text>
-          <TextInput
-            value={userDetails.prenom}
-            onChangeText={handleSurnameChange}
-            style={styles.input}
-          />
-        </Card.Content>
-      </Card>
+        <Card style={styles.card}>
+          <Card.Content>
+            <Text style={styles.cardTitle}>N°Tel</Text>
+            <TextInput
+              value={userDetails.tel}
+              onChangeText={handleEmailChange}
+              style={styles.input}
+            />
+          </Card.Content>
+        </Card>
 
-      {/* Email Card */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <Text style={styles.cardTitle}>N°Tel</Text>
-          <TextInput
-            value={userDetails.tel}
-            onChangeText={handleEmailChange}
-            style={styles.input}
-          />
-        </Card.Content>
-      </Card>
-
-      {/* Save Button */}
-      <Button
-        mode="contained"
-        style={styles.saveButton}
-        labelStyle={styles.buttonLabel}
-        onPress={async()=>{await saveUserData()}}
-      >
-        Save
-      </Button>
-    </View>
+        <Button
+          mode="contained"
+          style={styles.saveButton}
+          labelStyle={styles.buttonLabel}
+          onPress={async () => { await saveUserData() }}
+        >
+          Save
+        </Button>
+      </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -179,40 +130,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+    backgroundColor: '#f2f2f2',
   },
   title: {
     fontSize: 34,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: '#333',
   },
   userPhoto: {
-    width: 150,
-    height: 150,
+    width: 120,
+    height: 120,
     borderRadius: 75,
     marginBottom: 20,
   },
   card: {
-    width: '30%',
-    marginBottom: 20,
+    width: '80%',
+    marginBottom: 10,
     elevation: 4,
+    backgroundColor: '#fff',
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: 15,
     marginBottom: 10,
     fontWeight: 'bold',
+    color: '#333',
   },
   input: {
-    height: 40,
+    height: 30,
     marginBottom: 10,
   },
   saveButton: {
-    width: '30%',
-    height: 50,
+    width: '70%',
+    height: 40,
     borderRadius: 10,
     justifyContent: 'center',
+    backgroundColor: '#009688',
   },
   buttonLabel: {
     fontSize: 16,
+    color: '#fff',
   },
 });
 

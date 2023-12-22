@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground } from 'react-native';
-import picture from "./../assets/bg.jpg"
+import picture from "./../assets/bg.png"
 import firebase from '../Config/Index';
 const auth=firebase.auth();
 const Inscription = (props) => {
